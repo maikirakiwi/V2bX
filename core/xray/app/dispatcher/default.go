@@ -9,10 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/InazumaV/V2bX/common/counter"
-	"github.com/InazumaV/V2bX/common/rate"
-	"github.com/InazumaV/V2bX/limiter"
-
 	"github.com/xtls/xray-core/common"
 	"github.com/xtls/xray-core/common/buf"
 	"github.com/xtls/xray-core/common/errors"
@@ -29,6 +25,10 @@ import (
 	"github.com/xtls/xray-core/features/stats"
 	"github.com/xtls/xray-core/transport"
 	"github.com/xtls/xray-core/transport/pipe"
+
+	"github.com/InazumaV/V2bX/common/counter"
+	"github.com/InazumaV/V2bX/common/rate"
+	"github.com/InazumaV/V2bX/limiter"
 )
 
 var errSniffingTimeout = errors.New("timeout on sniffing")
@@ -204,8 +204,8 @@ func (d *DefaultDispatcher) getLink(ctx context.Context, network net.Network) (*
 		managedWriter := newManagedWriter(uplinkWriter, lm)
 		lm.AddLink(managedWriter, outboundLink.Reader)
 		inboundLink.Writer = managedWriter
+		sessionInbound.CanSpliceCopy = 3
 		if w != nil {
-			sessionInbound.CanSpliceCopy = 3
 			inboundLink.Writer = rate.NewRateLimitWriter(inboundLink.Writer, w)
 			outboundLink.Writer = rate.NewRateLimitWriter(outboundLink.Writer, w)
 		}

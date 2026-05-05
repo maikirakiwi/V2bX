@@ -3,7 +3,6 @@ package task
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -16,9 +15,8 @@ type Task struct {
 	Reload   func()
 	access   sync.Mutex
 
-	running   bool
-	stop      chan struct{}
-	executing atomic.Uint32
+	running bool
+	stop    chan struct{}
 }
 
 func (t *Task) Start(first bool) error {
@@ -78,22 +76,12 @@ func (t *Task) Start(first bool) error {
 }
 
 // executeWithTimeout wraps Execute with a timeout to prevent goroutine leaks
-// when API calls hang.
+// when API calls hang. Matches v2node's ExecuteWithTimeout pattern.
 func (t *Task) executeWithTimeout() error {
-	// Keep one in-flight execution at a time: if the previous call is still
-	// blocked, skip this cycle to avoid goroutine pile-up and cascading timeouts.
-	if !t.executing.CompareAndSwap(0, 1) {
-		log.Warnf("Task %s previous execution still running, skipping this cycle", t.Name)
-		return nil
+	timeout := 3 * t.Interval
+	if timeout > 5*time.Minute {
+		timeout = 5 * time.Minute
 	}
-	defer t.executing.Store(0)
-
-	// Keep timeout near API timeout to avoid long transient timeout windows.
-	timeout := 45 * time.Second
-	if t.Interval > 0 && t.Interval < 35*time.Second {
-		timeout = t.Interval + 10*time.Second
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

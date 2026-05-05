@@ -218,15 +218,15 @@ func (d *DefaultDispatcher) getLink(ctx context.Context, network net.Network) (*
 		}
 
 		ts := t.GetCounter(user.Email)
-		upcounter := &counter.XrayTrafficCounter{V: &ts.UpCounter}
-		downcounter := &counter.XrayTrafficCounter{V: &ts.DownCounter}
-		inboundLink.Writer = &SizeStatWriter{
-			Counter: upcounter,
-			Writer:  inboundLink.Writer,
+		// Count per-direction traffic from readers so both upload/download are
+		// captured even when writer path optimizations are enabled.
+		outboundLink.Reader = &CounterReader{
+			Reader:  &buf.TimeoutWrapperReader{Reader: outboundLink.Reader},
+			Counter: &ts.UpCounter,
 		}
-		outboundLink.Writer = &SizeStatWriter{
-			Counter: downcounter,
-			Writer:  outboundLink.Writer,
+		inboundLink.Reader = &CounterReader{
+			Reader:  &buf.TimeoutWrapperReader{Reader: inboundLink.Reader},
+			Counter: &ts.DownCounter,
 		}
 	}
 
